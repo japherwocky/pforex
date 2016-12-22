@@ -56,7 +56,7 @@ Pforex = {
 
         // set currency appropriate decimals
         var decimals = self.currencies[self.current].decimals;
-        price = Math.round(price/100 * (10**decimals)) / (10**decimals);
+        price = Math.round(price/100 * Math.pow(10, decimals)) / Math.pow(10, decimals);
 
         price = self.separate(price, self.currencies[self.current].separator);
 
