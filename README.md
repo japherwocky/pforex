@@ -1,3 +1,12 @@
+<style>
+
+h1,h2,h3,h4 {
+    margin: 13px;
+}
+
+</style>
+
+
 
 USAGE
 =====
@@ -15,8 +24,10 @@ LOAD
     <script src="/path/to/pforex.js"></script>
 
 
-SET CURRENCY
+SET LANGUAGE
 ------------
+
+
 
 ### w/ HTML:
 
@@ -52,47 +63,47 @@ MARK DOM ELEMENTS TO BE WATCHED
 
     <pforex price="100" />
 
-<pforex price="100" />
+$1
 
 
 #### decimals will show up if appropriate
 
     <pforex price="399" />
 
-<pforex price="399" />
+$3.99
 
 
 #### and commas
 
     <pforex price="500000" />
 
-<pforex price="500000" />
+$5,000
 
 
 #### showing currency defaults to "false":
 
     <pforex price="500000" showcurrency />
 
-<pforex price="500000" showcurrency />
+$5,000 USD
 
 
 #### regex support for hairy situations
 
-    <pforex price="10000" re=".+?(?= GIFTCARD)">$100 GIFTCARD</pforex>
+    <pforex price="10000" re=".+?(?= GIFTCARD)">N GIFTCARD</pforex>
 
-<pforex price="10000" re=".+?(?= GIFTCARD)">$100 GIFTCARD</pforex>
+$100 GIFTCARD
 
 
 
 LEGACY CODE
 -----------
 
+
 ### inject into pre-existing HTML with `data-pforex-*`:
 
     <span data-pforex-price="100" data-pforex-showcurrency="true" class="money">
     </span> 
 
-<span data-pforex-price="100" data-pforex-showcurrency="true" class="money"></span> 
 
 
     <span 
@@ -102,8 +113,6 @@ LEGACY CODE
     >
     SPECIAL THING ($1)
     </span> 
-
-<span data-pforex-price="100" data-pforex-re="\(.+?\)" class="money">SPECIAL THING ($1)</span> 
 
 
 DYNAMIC
@@ -127,11 +136,6 @@ DYNAMIC
     </script>
 
 
-<pforex id="dynamic-display" price="100" />
-
-<button id="clicker" >CLICK ME</button>
-
-
 TODO
 ----
 
@@ -145,7 +149,3 @@ TODO
         }
     </script>
     <script src="/path/to/pforex.js">
-
-
-
-<script src="/static/pforex.js"></script>
