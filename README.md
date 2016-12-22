@@ -1,13 +1,3 @@
-<style>
-
-h1,h2,h3,h4 {
-    margin: 13px;
-}
-
-</style>
-
-
-
 USAGE
 =====
 
@@ -24,10 +14,8 @@ LOAD
     <script src="/path/to/pforex.js"></script>
 
 
-SET LANGUAGE
+SET CURRENCY
 ------------
-
-
 
 ### w/ HTML:
 
@@ -37,14 +25,6 @@ SET LANGUAGE
         <option val="GBP">GBP</option> 
         <option val="JPY">JPY</option> 
     </select>
-
-<select pforex-selector >
-    <option val="USD">USD</option> 
-    <option val="EUR">EUR</option> 
-    <option val="GBP">GBP</option> 
-    <option val="JPY">JPY</option> 
-</select>
-
 
 
 ### w/ Javascript:
