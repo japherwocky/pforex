@@ -60,18 +60,34 @@ Pforex = {
 
         price = self.separate(price, self.currencies[self.current].separator);
 
-        var re = el.getAttribute('re') || el.getAttribute('data-pforex-re') || '.*';
-        re = RegExp(re);
-
         // create updated text
-        if ( (el.attributes['showcurrency'] || el.attributes['data-pforex-showcurrency']) === undefined) {
-            var out = el.innerHTML.replace(re, self.currencies[self.current].symbol + price)
-        } else {
-            var out = el.innerHTML.replace(re, self.currencies[self.current].symbol + price + ' ' + Pforex.current);
+        var out = self.currencies[self.current].symbol + price;
+
+        if ( (el.attributes['showcurrency'] || el.attributes['data-pforex-showcurrency']) !== undefined) {
+            out = out + ' ' + Pforex.current;
         }
 
-        // set it in place
-        el.innerHTML = out;
+        // find places we should insert it
+        var user_re = el.getAttribute('re') || el.getAttribute('data-pforex-re');
+
+        if (el.innerHTML.length === 0 || user_re === null) {
+            // if the element is empty, assume we need it
+            el.innerHTML = out;
+        } else {
+
+            var inner = el.innerHTML;
+            var re = RegExp(user_re,'g');
+
+            var match = re.exec(inner);
+
+            while ( match !== null && match.length > 1 ) {
+                inner = inner.replace(match[1], out);
+                match = re.exec(inner);
+            }
+
+            el.innerHTML = inner;
+
+        }
 
     },
 
