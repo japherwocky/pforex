@@ -58,7 +58,7 @@ Pforex = {
         var decimals = self.currencies[self.current].decimals;
         price = Math.round(price/100 * Math.pow(10, decimals)) / Math.pow(10, decimals);
 
-        price = self.separate(price, self.currencies[self.current].separator);
+        price = self.separate(price, self.currencies[self.current]);
 
         // create updated text
         var out = self.currencies[self.current].symbol + price;
@@ -167,13 +167,14 @@ Pforex = {
         },
 
 
-    separate: function (number, separator) {
+    separate: function (number, currency) {
 
         // regex from http://stackoverflow.com/questions/2901102/
         function sep(x) {
             var parts = x.toString().split(".");
-            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, separator);
-            return parts.join(".");
+            // TODO, some currencies like INR don't put separators every 3 places >.>
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, currency.thousandSep);
+            return parts.join(currency.decimalSep);
         }
 
         return sep(number);
@@ -185,38 +186,131 @@ Pforex = {
         'USD': {
                 symbol:'$',
                 decimals: 2,
-                separator: ',',
+                thousandSep: ',',
+                decimalSep: '.',
                 },
 
         'CAD': {
                 symbol:'$',
                 decimals: 2,
-                separator: ',',
-                },
-
-        'AUD': {
-                symbol:'$',
-                decimals: 2,
-                separator: ',',
+                thousandSep: ',',
+                decimalSep: '.',
                 },
 
         'EUR': {
                 symbol: '&euro;',
                 decimals: 2,
-                separator: ',',
+                thousandSep: ',',
+                decimalSep: '.',
+                },
+
+        'AUD': {
+                symbol:'$',
+                decimals: 2,
+                thousandSep: ' ',
+                decimalSep: '.',
+                },
+
+        'NZD': {
+                symbol:'$',
+                decimals: 2,
+                thousandSep: ',',
+                decimalSep: '.',
                 },
 
         'JPY': {
                 symbol: '&#165;',
                 decimals: 0,
-                separator: ',',
+                thousandSep: ',',
+                decimalSep: '.',
                 },
 
         'GBP': {
                 symbol: '&pound;',
                 decimals: 2,
-                separator: ',',
+                thousandSep: ',',
+                decimalSep: '.',
                 },
+
+        'INR': {
+                symbol: '₹',
+                decimals: 2,
+                thousandSep: ',',
+                decimalSep: '.',
+                },
+
+        'SGD': {
+                symbol: '$',
+                decimals: 2,
+                thousandSep: ',',
+                decimalSep: '.',
+                },
+
+        'MYR': {
+                symbol: 'RM',
+                decimals: 2,
+                thousandSep: ',',
+                decimalSep: '.',
+                },
+
+        'SAR': {
+                symbol: '﷼',
+                decimals: 2,
+                thousandSep: ',',
+                decimalSep: '.',
+                },
+
+        'AED': {
+                symbol: 'د.إ',
+                decimals: 2,
+                thousandSep: ',',
+                decimalSep: '.',
+                },
+
+        'SEK': {
+                symbol: 'kr',
+                decimals: 2,
+                thousandSep: ' ',
+                decimalSep: ',',
+                },
+
+        'NOK': {
+                symbol: 'kr',
+                decimals: 2,
+                thousandSep: '.',
+                decimalSep: ',',
+                },
+
+        'DKK': {
+                symbol: 'kr',
+                decimals: 2,
+                thousandSep: '.',
+                decimalSep: ',',
+                },
+
+        'CLP': {
+                symbol: '$',
+                decimals: 0,
+                thousandSep: '.',
+                decimalSep: '.',
+                },
+
+        'MXN': {
+                symbol: '$',
+                decimals: 2,
+                thousandSep: ',',
+                decimalSep: '.',
+                },
+
+        'BRL': {
+                symbol: '$',
+                decimals: 2,
+                thousandSep: '.',
+                decimalSep: ',',
+                },
+
+        
+
     },
 
 };

@@ -36,6 +36,9 @@ SET LANGUAGE
         <option val="EUR">EUR</option> 
         <option val="GBP">GBP</option> 
         <option val="JPY">JPY</option> 
+        <option val="NOK">NOK</option> 
+        <option val="DKK">DKK</option> 
+        <option val="BRL">BRL</option> 
     </select>
 
 <select pforex-selector >
@@ -43,6 +46,9 @@ SET LANGUAGE
     <option val="EUR">EUR</option> 
     <option val="GBP">GBP</option> 
     <option val="JPY">JPY</option> 
+    <option val="NOK">NOK</option> 
+    <option val="DKK">DKK</option> 
+    <option val="BRL">BRL</option> 
 </select>
 
 
@@ -66,14 +72,14 @@ MARK DOM ELEMENTS TO BE WATCHED
 <pforex price="100" />
 
 
-#### decimals will show up if appropriate
+#### decimal separators will show up if appropriate
 
     <pforex price="399" />
 
 <pforex price="399" />
 
 
-#### and commas
+#### and thousands separators
 
     <pforex price="500000" />
 
