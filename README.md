@@ -69,7 +69,7 @@ $5,000 USD
 
 #### regex support for hairy situations
 
-    <pforex price="10000" re=".+?(?= GIFTCARD)">N GIFTCARD</pforex>
+    <pforex price="10000" re="(.+?) GIFTCARD">N GIFTCARD</pforex>
 
 $100 GIFTCARD
 
@@ -88,7 +88,7 @@ LEGACY CODE
 
     <span 
         data-pforex-price="100" 
-        data-pforex-re="\(.+?\)" 
+        data-pforex-re="\((.+?)\)" 
         class="money"
     >
     SPECIAL THING ($1)

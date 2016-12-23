@@ -89,9 +89,9 @@ MARK DOM ELEMENTS TO BE WATCHED
 
 #### regex support for hairy situations
 
-    <pforex price="10000" re=".+?(?= GIFTCARD)">$100 GIFTCARD</pforex>
+    <pforex price="10000" re="(.+?) GIFTCARD">$100 GIFTCARD</pforex>
 
-<pforex price="10000" re=".+?(?= GIFTCARD)">$100 GIFTCARD</pforex>
+<pforex price="10000" re="(.+?) GIFTCARD">$100 GIFTCARD</pforex>
 
 
 
@@ -109,13 +109,13 @@ LEGACY CODE
 
     <span 
         data-pforex-price="100" 
-        data-pforex-re="\(.+?\)" 
+        data-pforex-re="\((.+?)\)" 
         class="money"
     >
-    SPECIAL THING ($1)
+    SPECIAL THING ($1) ($1)
     </span> 
 
-<span data-pforex-price="100" data-pforex-re="\(.+?\)" class="money">SPECIAL THING ($1)</span> 
+<span data-pforex-price="100" data-pforex-re="\((.+?)\)" class="money">SPECIAL THING ($1) ($5)</span> 
 
 
 DYNAMIC
