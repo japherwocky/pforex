@@ -72,7 +72,6 @@ Pforex = {
 
         // price, ON by default
         if (price !== 'NaN') { 
-            console.log('out', out, price);
             out = out + price;
         }    
 
