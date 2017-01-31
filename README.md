@@ -62,9 +62,23 @@ $5,000
 
 #### showing currency defaults to "false":
 
-    <pforex price="500000" showcurrency />
+    <pforex price="500000" show-currency="true" />
 
 $5,000 USD
+
+
+#### showing the currency symbol defaults to "true":
+
+    <pforex price="500000" show-symbol="false" />
+
+5,000
+
+
+#### Omit the price for labels:
+
+    <pforex show-symbol="false" show-currency="true" />
+
+USD
 
 
 #### regex support for hairy situations

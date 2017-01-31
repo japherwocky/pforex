@@ -61,10 +61,27 @@ Pforex = {
         price = self.separate(price, self.currencies[self.current]);
 
         // create updated text
-        var out = self.currencies[self.current].symbol + price;
 
-        if ( (el.attributes['showcurrency'] || el.attributes['data-pforex-showcurrency']) !== undefined) {
-            out = out + ' ' + Pforex.current;
+        var out = '';
+
+        // currency symbol, ON by default
+        if ( (el.getAttribute('show-symbol') || el.getAttribute('data-pforex-show-symbol')) !== 'false') { 
+            out = out + self.currencies[self.current].symbol;
+        }
+
+        // price, ON by default
+        if (price !== 'NaN') { 
+            console.log('out', out, price);
+            out = out + price;
+        }    
+
+        // currency code, OFF by default
+        if ( (el.getAttribute('show-currency') || el.getAttribute('data-pforex-show-currency')) === 'true') {
+            if (out.length >= 0) {
+                out = out + ' ' + Pforex.current;
+            } else {
+                out = Pforex.current;
+            }
         }
 
         // find places we should insert it
