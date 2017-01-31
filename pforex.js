@@ -3,6 +3,7 @@ var Q = function (str) { return document.querySelectorAll(str)};
 Pforex = {
     base: 'USD', // our base currency
     current: 'EUR', // currently chosen
+    version: '0.2',
 
     init: function () {
 
