@@ -410,7 +410,12 @@ Pforex = {
                 decimalSep: ',',
                 },
 
-        
+        'ILS': {
+                symbol: '₪',
+                decimals: 2,
+                thousandSep: ',',
+                decimalSep: '.',
+                },
 
     },
 
