@@ -83,10 +83,24 @@ Pforex = {
 
         var on_data = function (success, error) {
 
-            // check for existing choices from cookies
-            if (Cookies.get('pforex') !== undefined) {
+            // look for a GET parameter of 'currency', eg ?currency=USD
+            function getParameterByName(name) {
+                var match = new RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+                return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+            }
+
+            var qstring = getParameterByName('currency')
+            if (qstring && Pforex.currencies[qstring]) {
+                Pforex.set(qstring);
+            }
+
+            // check / override w/ existing choices from cookies
+            else if (Cookies.get('pforex') !== undefined) {
                 Pforex.set(Cookies.get('pforex'));
-            } else {
+            } 
+
+            // or default
+            else {
                 Pforex.set('USD');
             }
 
