@@ -63,12 +63,17 @@ if (!Array.prototype.forEach) {
   };
 }
 
+// querySelectorAll polyfill
+document.querySelectorAll||(document.querySelectorAll=function(a){var b=document,c=b.documentElement.firstChild,d=b.createElement("STYLE");return c.appendChild(d),b.__qsaels=[],d.styleSheet.cssText=a+"{x:expression(document.__qsaels.push(this))}",window.scrollBy(0,0),b.__qsaels});
+
+// kind of silly QoL alias
 var Q = function (str) { return document.querySelectorAll(str)};
+
 
 Pforex = {
     base: 'USD', // our base currency
     current: 'EUR', // currently chosen
-    version: '0.2',
+    version: '0.3',
 
     init: function () {
 
