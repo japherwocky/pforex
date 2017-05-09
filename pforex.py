@@ -9,10 +9,10 @@ import tornado.options
 import tornado.web
 from tornado.web import HTTPError
 from markdown import markdown
-
+from keys import SHOPIFY_API 
 
 class App (tornado.web.Application):
-    def __init__(self, debug=False):
+    def __init__(self, domain, debug):
         """
         Settings for our application
         """
@@ -23,12 +23,16 @@ class App (tornado.web.Application):
             debug=debug,  # restarts app server on changes to local files
         )
 
+        self.domain = domain
+
         """
         map URLs to Handlers, with regex patterns
         """
 
         handlers = [
             (r"/", Home),
+            (r"/oauth", OAuth),
+            (r"/installation", Installation),
         ]
 
         tornado.web.Application.__init__(self, handlers, **settings)
@@ -37,7 +41,40 @@ class App (tornado.web.Application):
 class Home(tornado.web.RequestHandler):
     def get(self):
 
-        txt = open('README.md').read()
+        txt = open('templates/INSTRUCTIONS.md').read()
+        txt = markdown(unicode(txt, 'utf-8'))
+
+        self.render('index.html', README=txt)
+
+# PRE INSTALL
+class OAuth(tornado.web.RequestHandler):
+    def get(self):
+
+        """
+        Redirects the user to the ADD APP button on Shopify's end
+        """
+
+        shop = self.request.arguments['shop'][0]
+        scopes = 'read_script_tags,write_script_tags'
+        key = SHOPIFY_API
+
+        redirect = "https://{}/admin/oauth/authorize?client_id={}&scope={}&redirect_uri=https://{}/installation".format(
+            shop, 
+            key, 
+            scopes, 
+            self.application.domain
+        )
+
+        self.redirect(redirect)
+
+# POST INSTALL
+class Installation(tornado.web.RequestHandler):
+    def get(self):
+        """ 
+            general instructions on how to install a currency switcher, loading spinner to install <script>
+        """
+
+        txt = open('templates/INSTRUCTIONS.md').read()
         txt = markdown(unicode(txt, 'utf-8'))
 
         self.render('index.html', README=txt)
@@ -71,10 +108,11 @@ def main():
     from tornado.options import define, options
     define("port", default=8001, help="run on the given port", type=int)
     define("debug", default=False, help="run server in debug mode", type=bool)
+    define("domain", default='localhost', help="domain and subdomain app is running under")
 
     tornado.options.parse_command_line()
 
-    http_server = tornado.httpserver.HTTPServer( App(debug=options.debug))
+    http_server = tornado.httpserver.HTTPServer( App(options.domain, options.debug))
     http_server.listen(options.port)
     info('Serving on port %d' % options.port)
     tornado.ioloop.IOLoop.instance().start()
