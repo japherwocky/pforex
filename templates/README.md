@@ -26,13 +26,6 @@ SET CURRENCY
         <option val="JPY">JPY</option> 
     </select>
 
-<select pforex-selector >
-    <option val="USD">USD</option> 
-    <option val="EUR">EUR</option> 
-    <option val="GBP">GBP</option> 
-    <option val="JPY">JPY</option> 
-</select>
-
 
 ### w/ Javascript:
 
