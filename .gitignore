@@ -1,0 +1,8 @@
+*.py[o|c|d]
+*.swp
+*.pem
+
+keys.py
+.vagrant
+env/
+cache/

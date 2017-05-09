@@ -1,0 +1,73 @@
+---
+- hosts: all
+  sudo: yes
+  vars_files:
+    - playbook-vars.yml
+
+  pre_tasks:
+    - name: set locale
+      locale_gen: name="en_US.UTF-8" state=present
+
+    - name: create user
+      user: name={{ project_name }}  home={{ project_root }} uid={{ project_uid }} shell=/bin/bash
+
+    - name: create project directory
+      file: group={{ project_name }} owner={{ project_name }} mode=755 state=directory path={{ project_root }}
+
+    - name: create logging directory
+      file: group={{ project_name }} owner={{ project_name }} mode=755 state=directory path='/var/log/{{ project_name }}'
+
+    - name: set locale for project user
+      locale_gen: name="en_US.UTF-8" state=present
+      sudo: yes
+      sudo_user: "{{ project_name }}"
+
+    - name: add user to vagrant group
+      user: name={{ project_name }} groups=vagrant append=yes
+      when: vagrant_env == "local"
+
+  tasks:
+    # grab a newer stable nginx
+    - name: Add nginx apt repository
+      apt_repository: repo='ppa:nginx/stable'
+
+    - apt: update_cache=yes
+
+    - name: Install required system packages.
+      apt: pkg={{ item }} state=installed
+      with_items: system_packages
+
+    - name: Pull source code from repository
+      git: 
+        repo: "{{ project_repo }}"
+        dest: "{{ application_path }}" 
+      sudo_user: "{{ project_name }}"
+      when: vagrant_env != 'local'
+
+    - name: Install nginx configuration file
+      template:
+        src: "./nginx.conf"
+        dest: "/etc/nginx/nginx.conf"
+      tags: nginx
+
+    #TODO - trigger this on config change
+    - name: Restart nginx
+      service: name=nginx state=restarted
+      sudo_user: root
+      tags: nginx
+
+    - name: Create / update app virtualenv.
+      pip: requirements={{ application_path }}/requirements.txt virtualenv={{ virtualenv_path }}
+      sudo_user: "{{ project_name }}"
+      tags: virtualenv
+
+    - name: Install Upstart script
+      template:
+        src: "./upstart.conf"
+        dest: "/etc/init/pforex.conf"
+      tags: upstart
+
+    - name: Restart app
+      service: name=pforex state=restarted
+      sudo_user: root
+      tags: upstart
