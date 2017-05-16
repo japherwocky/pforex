@@ -7,6 +7,7 @@ Pforex = {
 
     init: function () {
 
+        console.log('initializing..')
 
         // set up any select elements
         this.mkSelector();
@@ -80,14 +81,14 @@ Pforex = {
         var out = '';
 
         // currency symbol, ON by default
-        if ( (el.getAttribute('show-symbol') || el.getAttribute('data-pforex-show-symbol')) !== 'false') { 
+        if ( (el.getAttribute('show-symbol') || el.getAttribute('data-pforex-show-symbol')) !== 'false') {
             out = out + self.currencies[self.current].symbol;
         }
 
         // price, ON by default
-        if (price !== 'NaN') { 
+        if (price !== 'NaN') {
             out = out + price;
-        }    
+        }
 
         // currency code, OFF by default
         if ( (el.getAttribute('show-currency') || el.getAttribute('data-pforex-show-currency')) === 'true') {
@@ -98,7 +99,7 @@ Pforex = {
             }
         }
 
-        // find places we should insert it
+        // look for custom / weird places we should insert the price
         var user_re = el.getAttribute('re') || el.getAttribute('data-pforex-re');
 
         if (el.innerHTML.length === 0 || user_re === null) {
@@ -111,12 +112,34 @@ Pforex = {
 
             var match = re.exec(inner);
 
-            while ( match !== null && match.length > 1 ) {
+            if (match && match[1]) {
+                el.innerHTML = inner.replace(match[1], out);
+            }
+
+            /*
+            // it's possible to write regex patterns that match infinitely,
+            // so we'll count and break the loop if that might be the case.
+            var i = 0;
+
+            console.log(match)
+
+            while ( match !== null && match.length > 1) {
+
+                // if we're stuck in a loop, error out
+                i ++;
+
+                if (i > 12) {
+                    throw Error("Too many matches for " + user_re);
+                }
+
                 inner = inner.replace(match[1], out);
                 match = re.exec(inner);
+                console.log(inner, match)
             }
 
             el.innerHTML = inner;
+
+            */
 
         }
 

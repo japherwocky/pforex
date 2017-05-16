@@ -1,11 +1,11 @@
 INSTALLATION
-------------
+============
 
 Head over to the [Shopify app store](https://apps.shopify.com/pforex) and hit the giant green GET button!
 
 
 CURRENCY SELECTION
-------------------
+==================
 There are three ways to dynamically change the currency the page is displaying.
 
 
@@ -68,7 +68,7 @@ Or get the currently displayed currency:
 
 ### DEFAULTS
 
-#### use integers for prices
+Using pforex can be as simple as adding a snippet into your templates.
 
     <pforex price="100" />
 
@@ -110,35 +110,50 @@ Or get the currently displayed currency:
 <pforex show-symbol="false" show-currency="true" />
 
 
-#### regex support for hairy situations
+#### regex support
+
+Sometimes you may not be able to cleanly wrap the text of the currency element.
+
+Use `re` and a regex pattern to show pforex where to insert the price.
+
 
     <pforex price="10000" re="(.+?) GIFTCARD">N GIFTCARD</pforex>
 
-
-LEGACY CODE
------------
-
-
-### inject into pre-existing HTML with `data-pforex-*`:
-
-    <span data-pforex-price="100" data-pforex-showcurrency="true" class="money">
-    </span> 
+<pforex price="10000" re="(N) GIFTCARD">N GIFTCARD</pforex>
 
 
 
-    <span 
-        data-pforex-price="100" 
-        data-pforex-re="\((.+?)\)" 
-        class="money"
-    >
-    SPECIAL THING ($1)
-    </span> 
+#### Integration with legacy templates:
+
+You can also blend pforex into Legacy code, or situations where you can't create a `<pforex>` element,
+by using `data-pforex-*`.
+
+    <span data-pforex-price="499"></span>
+
+<span data-pforex-price="499"></span>
 
 
-DYNAMIC
-------- 
+Combine with regex patterns, you can tackle tricky situations.  
 
-### to change the price of an element, just change `price`
+Maybe you have a select box full of products that have prices in the title:
+
+    <select>
+        <option data-pforex-price="500" data-pforex-re="(.+) GIFTCARD">$5 GIFTCARD</option>
+        <option data-pforex-price="1000" data-pforex-re="(.+) GIFTCARD">$10 GIFTCARD</option>
+        <option data-pforex-price="1500" data-pforex-re="(.+) GIFTCARD">$15 GIFTCARD</option>
+    </select>
+
+<select>
+    <option data-pforex-price="500" data-pforex-re="(.+) GIFTCARD">$5 GIFTCARD</option>
+    <option data-pforex-price="1000" data-pforex-re="(.+) GIFTCARD">$10 GIFTCARD</option>
+    <option data-pforex-price="1500" data-pforex-re="(.+) GIFTCARD">$15 GIFTCARD</option>
+</select>
+
+
+
+#### Integration with legacy JavaScript:
+
+To change the price of something, just change the `price` attribute.
 
     <pforex id="dynamic-display" price="100" />
 
@@ -154,3 +169,21 @@ DYNAMIC
             );
         });
     </script>
+
+<pforex id="dynamic-display" price="100" />
+
+<button id="clicker" >CLICK ME</button>
+
+<script>
+    var button = document.querySelector('#clicker');
+    var display = document.querySelector('#dynamic-display');
+
+    button.addEventListener( 'click', function () {
+        display.setAttribute('price', 
+            (parseInt(display.getAttribute('price'))+1313) 
+        );
+    });
+</script>
+
+
+
