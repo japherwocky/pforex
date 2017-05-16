@@ -7,20 +7,12 @@ Pforex = {
 
     init: function () {
 
-        console.log('initializing..')
-
         // set up any select elements
         this.mkSelector();
 
         var on_data = function (success, error) {
 
-            // look for a GET parameter of 'currency', eg ?currency=USD
-            function getParameterByName(name) {
-                var match = new RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
-                return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
-            }
-
-            var qstring = getParameterByName('currency')
+            var qstring = Pforex.getParameterByName('currency');
             if (qstring && Pforex.currencies[qstring]) {
                 Pforex.set(qstring);
             }
@@ -28,7 +20,7 @@ Pforex = {
             // check / override w/ existing choices from cookies
             else if (Cookies.get('pforex') !== undefined) {
                 Pforex.set(Cookies.get('pforex'));
-            } 
+            }
 
             // or default
             else {
@@ -37,7 +29,7 @@ Pforex = {
 
             Pforex.update(); // kick off an initial render
             Pforex.watch(); // set observers on tags
-        }
+        };
 
         // fetch current exchange data, then update prices
         this.data(on_data, on_data);
@@ -50,12 +42,12 @@ Pforex = {
 
         var observer = new MutationObserver( function(deltas) {
             // one or many changes
-            deltas.forEach( function(d) {self.render(d.target)});
-        })
+            deltas.forEach( function(d) {self.render(d.target);});
+        });
 
         var watch_factory = function(element) {
-            observer.observe(element, {attributes:true})
-        }
+            observer.observe(element, {attributes:true});
+        };
 
         Q('[data-pforex-price]').forEach( watch_factory );
         Q('pforex').forEach( watch_factory );
@@ -77,7 +69,6 @@ Pforex = {
         price = self.separate(price, self.currencies[self.current]);
 
         // create updated text
-
         var out = '';
 
         // currency symbol, ON by default
@@ -115,32 +106,6 @@ Pforex = {
             if (match && match[1]) {
                 el.innerHTML = inner.replace(match[1], out);
             }
-
-            /*
-            // it's possible to write regex patterns that match infinitely,
-            // so we'll count and break the loop if that might be the case.
-            var i = 0;
-
-            console.log(match)
-
-            while ( match !== null && match.length > 1) {
-
-                // if we're stuck in a loop, error out
-                i ++;
-
-                if (i > 12) {
-                    throw Error("Too many matches for " + user_re);
-                }
-
-                inner = inner.replace(match[1], out);
-                match = re.exec(inner);
-                console.log(inner, match)
-            }
-
-            el.innerHTML = inner;
-
-            */
-
         }
 
     },
@@ -156,22 +121,21 @@ Pforex = {
         Q('[data-pforex-price]').forEach( Pforex.render );
        
         // sync selectors 
-        Q('select[pforex-selector]').forEach( function(el) { 
+        Q('select[pforex-selector]').forEach( function(el) {
             el.value = Pforex.current;
-        })
+        });
     },
 
 
     // set handlers for any currency selectors
     mkSelector: function () {
 
-        Q('select[pforex-selector]').forEach( function(el) { 
-
+        Q('select[pforex-selector]').forEach( function(el) {
             // on change
             el.onchange = function(event) {
                 Pforex.set(event.target.value); // this will also trigger an update()
-            }
-        })
+            };
+        });
     },
 
 
@@ -180,7 +144,7 @@ Pforex = {
 
         // validate
         if (Pforex.currencies[currency] !== undefined) {
-            Pforex.current = currency 
+            Pforex.current = currency;
         } else {
             console.log('Attempting to set unknown currency:', currency);
         }
@@ -193,7 +157,7 @@ Pforex = {
     },
 
     // getter for consistency
-    get: function () { return Pforex.current },
+    get: function () { return Pforex.current; },
 
 
     // load exchange data
@@ -214,10 +178,10 @@ Pforex = {
                 // something went wrong :(
                 console.log('Pforex could not load currency data:', xhr);
                 return err ? err() : false;
-            };
+            }
         };
         
-        xhr.send();    
+        xhr.send();
         },
 
 
@@ -234,6 +198,11 @@ Pforex = {
         return sep(number);
     },
 
+    getParameterByName: function getParameterByName(name) {
+        // look for a GET parameter of 'currency', eg ?currency=USD
+        var match = new RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+        return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+    },
 
     currencies: {
 
