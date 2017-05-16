@@ -11,6 +11,7 @@ from tornado.web import HTTPError
 from markdown import markdown
 from keys import SHOPIFY_API 
 
+
 class App (tornado.web.Application):
     def __init__(self, domain, debug):
         """
@@ -41,10 +42,10 @@ class App (tornado.web.Application):
 class Home(tornado.web.RequestHandler):
     def get(self):
 
-        txt = open('templates/INSTRUCTIONS.md').read()
+        txt = open('templates/DEMO.md').read()
         txt = markdown(unicode(txt, 'utf-8'))
 
-        self.render('index.html', README=txt)
+        self.render('index.html', DEMO=txt)
 
 # PRE INSTALL
 class OAuth(tornado.web.RequestHandler):
