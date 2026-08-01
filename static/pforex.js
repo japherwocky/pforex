@@ -1,601 +1,352 @@
+/*
+ * pforex 0.4 -- easy foreign currencies
+ * https://github.com/japherwocky/pforex
+ *
+ * Drop this in with a <script> tag and it converts and formats every price
+ * on the page. It is deliberately dependency-free and framework-free: the
+ * whole point is that it gets injected into storefront themes nobody on our
+ * end has ever seen.
+ */
+(function (window, document) {
+'use strict';
+
+var Pforex = {
+
+    version: '0.4',
+
+    // Prices are authored in this currency, as integers in its smallest
+    // unit (cents). `current` is what we are displaying right now.
+    base: 'USD',
+    current: 'USD',
+
+    // Where to get exchange rates. Frankfurter serves the European Central
+    // Bank's daily reference rates over CORS with no key and no signup, and
+    // it hands back plain JSON -- which is the entire reason it replaced the
+    // previous approach of fetching Shopify's currencies.js and eval'ing it.
+    ratesUrl: 'https://api.frankfurter.dev/v1/latest?base=USD',
+
+    // rates[X] is how many X one unit of `base` buys. Null until the fetch
+    // lands; every render path checks before touching it.
+    rates: null,
+
+    // Rewrite ?currency= in the address bar when the currency changes. Off
+    // unless the page was *loaded* with that parameter, in which case we
+    // keep it honest so the URL stays shareable -- see init(). Set it true
+    // to always rewrite.
+    syncQuery: false,
 
 
-Pforex = {
-    base: 'USD', // our base currency
-    current: 'EUR', // currently chosen
-    version: '0.3',
+    /* ---- lifecycle ---------------------------------------------------- */
 
-    init: function () {
-
-
-        // set up any select elements
-        this.mkSelector();
-
-        var on_data = function (success, error) {
-
-            // look for a GET parameter of 'currency', eg ?currency=USD
-            function getParameterByName(name) {
-                var match = new RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
-                return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
-            }
-
-            var qstring = getParameterByName('currency')
-            if (qstring && Pforex.currencies[qstring]) {
-                Pforex.set(qstring);
-            }
-
-            // check / override w/ existing choices from cookies
-            else if (Cookies.get('pforex') !== undefined) {
-                Pforex.set(Cookies.get('pforex'));
-            } 
-
-            // or default
-            else {
-                Pforex.set('USD');
-            }
-
-            Pforex.update(); // kick off an initial render
-            Pforex.watch(); // set observers on tags
-        }
-
-        // fetch current exchange data, then update prices
-        this.data(on_data, on_data);
-
-    },
-
-    // set up DOMSubtreeModified handlers on specific tags
-    watch: function() {
+    init: function (options) {
         var self = this;
 
-        var observer = new MutationObserver( function(deltas) {
-            // one or many changes
-            deltas.forEach( function(d) {self.render(d.target)});
-        })
-
-        var watch_factory = function(element) {
-            observer.observe(element, {attributes:true})
+        if (options) {
+            Object.keys(options).forEach(function (key) {
+                self[key] = options[key];
+            });
         }
 
-        Q('[data-pforex-price]').forEach( watch_factory );
-        Q('pforex').forEach( watch_factory );
+        this.mkSelector();
+
+        // A currency named in the URL wins over a remembered one, and a URL
+        // that named a currency keeps naming it as the reader changes it.
+        var wanted = this.getParameterByName('currency');
+
+        if (wanted && this.currencies[wanted]) {
+            this.current = wanted;
+            this.syncQuery = true;
+        } else if (this.readCookie('pforex') && this.currencies[this.readCookie('pforex')]) {
+            this.current = this.readCookie('pforex');
+        }
+
+        // Render immediately off the fallback table and again when the live
+        // rates land. Waiting for the network first meant every price on the
+        // page sat empty until the request came back.
+        this.rates = this.fallbackRates;
+        this.update();
+        this.watch();
+
+        this.data(function () { self.update(); });
     },
- 
+
+    // Fetch live rates, then hand back to the callback. A failure is not
+    // fatal: we already rendered off the fallback table, so the page keeps
+    // working with slightly stale numbers rather than breaking.
+    data: function (done) {
+        var self = this;
+
+        if (!window.fetch) {
+            return done && done();
+        }
+
+        window.fetch(this.ratesUrl)
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('pforex: rates request failed, ' + response.status);
+                }
+                return response.json();
+            })
+            .then(function (payload) {
+                var rates = payload && payload.rates;
+
+                if (!rates) {
+                    throw new Error('pforex: no rates in response');
+                }
+
+                // The feed omits the base currency from its own table.
+                rates[self.base] = 1;
+                self.rates = rates;
+
+                return done && done();
+            })
+            .catch(function (err) {
+                if (window.console && console.warn) {
+                    console.warn(err.message || err, '-- falling back to bundled rates');
+                }
+                return done && done();
+            });
+    },
+
+    // Re-render when somebody changes a price attribute in place.
+    watch: function () {
+        var self = this;
+
+        var observer = new MutationObserver(function (deltas) {
+            deltas.forEach(function (d) { self.render(d.target); });
+        });
+
+        this.priced().forEach(function (el) {
+            observer.observe(el, { attributes: true });
+        });
+    },
+
+
+    /* ---- rendering ---------------------------------------------------- */
+
     render: function (el) {
         var self = Pforex;
- 
-        // get base price set on the element
-        var price = parseInt( el.getAttribute('price') || el.getAttribute('data-pforex-price'));
-        
-        // convert to current currency
-        price = price * self.rates[self.base] / self.rates[self.current];
+        var currency = self.currencies[self.current];
 
-        // set currency appropriate decimals
-        var decimals = self.currencies[self.current].decimals;
-        price = Math.round(price/100 * Math.pow(10, decimals)) / Math.pow(10, decimals);
+        if (!currency || !self.rates) {
+            return;
+        }
 
-        price = self.separate(price, self.currencies[self.current]);
-
-        // create updated text
+        var attr = function (name) {
+            return el.getAttribute(name) || el.getAttribute('data-pforex-' + name);
+        };
 
         var out = '';
 
-        // currency symbol, ON by default
-        if ( (el.getAttribute('show-symbol') || el.getAttribute('data-pforex-show-symbol')) !== 'false') { 
-            out = out + self.currencies[self.current].symbol;
+        // Currency symbol, ON by default.
+        if (attr('show-symbol') !== 'false') {
+            out += currency.symbol;
         }
 
-        // price, ON by default
-        if (price !== 'NaN') { 
-            out = out + price;
-        }    
+        // The price itself. Omitting it entirely is legal and gives you a
+        // bare label -- a legend, or a column header that follows the
+        // selector -- so a missing attribute is not an error.
+        var raw = attr('price');
 
-        // currency code, OFF by default
-        if ( (el.getAttribute('show-currency') || el.getAttribute('data-pforex-show-currency')) === 'true') {
-            if (out.length >= 0) {
-                out = out + ' ' + Pforex.current;
-            } else {
-                out = Pforex.current;
+        if (raw !== null && raw !== '') {
+            var cents = parseInt(raw, 10);
+
+            if (!isNaN(cents)) {
+                out += self.separate(self.convert(cents), currency);
             }
         }
 
-        // find places we should insert it
-        var user_re = el.getAttribute('re') || el.getAttribute('data-pforex-re');
+        // Currency code, OFF by default.
+        if (attr('show-currency') === 'true') {
+            out += (out.length ? ' ' : '') + self.current;
+        }
 
-        if (el.innerHTML.length === 0 || user_re === null) {
-            // if the element is empty, assume we need it
+        var pattern = attr('re');
+
+        if (!pattern || el.innerHTML.length === 0) {
+            // Nothing to preserve, so the element is just a container.
             el.innerHTML = out;
-        } else {
-
-            var inner = el.innerHTML;
-            var re = RegExp(user_re,'g');
-
-            var match = re.exec(inner);
-
-            while ( match !== null && match.length > 1 ) {
-                inner = inner.replace(match[1], out);
-                match = re.exec(inner);
-            }
-
-            el.innerHTML = inner;
-
+            return;
         }
 
+        // The escape hatch: the price is buried in copy we do not control,
+        // so swap the first capture group in place and leave the rest alone.
+        var match = RegExp(pattern).exec(el.innerHTML);
+
+        if (match && match[1]) {
+            el.innerHTML = el.innerHTML.replace(match[1], out);
+        }
     },
 
+    // Cents in the base currency to a decimal amount in the current one.
+    convert: function (cents) {
+        var rate = this.rates[this.current] / this.rates[this.base];
+        return (cents * rate) / 100;
+    },
 
-    // on a language update (or data), update the render_price on all our objs 
+    // Format a number the way the target currency writes numbers: its own
+    // decimal count, its own separators, its own digit grouping.
+    separate: function (amount, currency) {
+        var parts = amount.toFixed(currency.decimals).split('.');
+        parts[0] = this.group(parts[0], currency);
+        return parts.join(currency.decimalSep);
+    },
+
+    // Most currencies break every three digits. The Indian system groups the
+    // last three and then pairs upward, so 100000 is 1,00,000.
+    group: function (digits, currency) {
+        if (currency.grouping === 'indian') {
+            var head = digits.slice(0, -3);
+            var tail = digits.slice(-3);
+
+            if (!head) {
+                return tail;
+            }
+
+            return head.replace(/\B(?=(\d{2})+(?!\d))/g, currency.thousandSep) +
+                currency.thousandSep + tail;
+        }
+
+        return digits.replace(/\B(?=(\d{3})+(?!\d))/g, currency.thousandSep);
+    },
+
+    // Re-render everything and resync the selectors.
     update: function () {
+        this.priced().forEach(this.render);
 
-        // render <pforex> tags
-        Q('pforex').forEach( Pforex.render );
-
-        // or legacy code we're injected into
-        Q('[data-pforex-price]').forEach( Pforex.render );
-       
-        // sync selectors 
-        Q('select[pforex-selector]').forEach( function(el) { 
+        this.all('select[pforex-selector]').forEach(function (el) {
             el.value = Pforex.current;
-        })
+        });
     },
 
 
-    // set handlers for any currency selectors
-    mkSelector: function () {
+    /* ---- currency selection ------------------------------------------- */
 
-        Q('select[pforex-selector]').forEach( function(el) { 
-
-            // on change
-            el.onchange = function(event) {
-                Pforex.set(event.target.value); // this will also trigger an update()
+    set: function (currency) {
+        if (this.currencies[currency] === undefined) {
+            if (window.console && console.warn) {
+                console.warn('pforex: unknown currency', currency);
             }
-        })
-    },
-
-
-    // set the current currency, if it's valid
-    set: function(currency) {
-
-        // validate
-        if (Pforex.currencies[currency] !== undefined) {
-            Pforex.current = currency 
-        } else {
-            console.log('Attempting to set unknown currency:', currency);
+            return this.current;
         }
 
-        // set cookie
-        Cookies.set('pforex', Pforex.current);
+        this.current = currency;
+        this.writeCookie('pforex', currency);
 
-        Pforex.update();
-
-    },
-
-    // getter for consistency
-    get: function () { return Pforex.current },
-
-
-    // load exchange data
-    data: function (cb, err) {
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', '//cdn.shopify.com/s/javascripts/currencies.js');
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                // sorry, this will override the global Currency :(
-                eval(xhr.responseText);
-                Pforex.rates = Currency.rates;
-
-                // run callback if it existed
-                return cb ? cb() : false;
-
-            } else {
-
-                // something went wrong :(
-                console.log('Pforex could not load currency data:', xhr);
-                return err ? err() : false;
-            };
-        };
-        
-        xhr.send();    
-        },
-
-
-    separate: function (number, currency) {
-
-        // regex from http://stackoverflow.com/questions/2901102/
-        function sep(x) {
-            var parts = x.toString().split(".");
-            // TODO, some currencies like INR don't put separators every 3 places >.>
-            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, currency.thousandSep);
-            return parts.join(currency.decimalSep);
+        if (this.syncQuery) {
+            this.writeParameter('currency', currency);
         }
 
-        return sep(number);
+        this.update();
+
+        return this.current;
+    },
+
+    get: function () {
+        return this.current;
+    },
+
+    // Any <select pforex-selector> on the page drives the currency, and they
+    // all stay in step with each other through update().
+    mkSelector: function () {
+        this.all('select[pforex-selector]').forEach(function (el) {
+            el.addEventListener('change', function (event) {
+                Pforex.set(event.target.value);
+            });
+        });
     },
 
 
+    /* ---- odds and ends ------------------------------------------------ */
+
+    all: function (selector) {
+        return Array.prototype.slice.call(document.querySelectorAll(selector));
+    },
+
+    // Everything carrying a price, in either the tag spelling or the
+    // attribute spelling we use for markup we cannot rewrite.
+    priced: function () {
+        return this.all('pforex, [data-pforex-price]');
+    },
+
+    getParameterByName: function (name) {
+        var match = new RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+        return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+    },
+
+    // replaceState rather than pushState: the reader flipping a currency
+    // selector should not have to press Back four times to leave the page.
+    writeParameter: function (name, value) {
+        if (!window.history || !window.history.replaceState) {
+            return;
+        }
+
+        var url = new URL(window.location.href);
+        url.searchParams.set(name, value);
+        window.history.replaceState({}, '', url.toString());
+    },
+
+    readCookie: function (name) {
+        var match = new RegExp('(?:^|; )' + name + '=([^;]*)').exec(document.cookie);
+        return match ? decodeURIComponent(match[1]) : null;
+    },
+
+    writeCookie: function (name, value) {
+        var expires = new Date();
+        expires.setFullYear(expires.getFullYear() + 1);
+
+        document.cookie = name + '=' + encodeURIComponent(value) +
+            ';path=/;expires=' + expires.toUTCString();
+    },
+
+
+    /* ---- data ---------------------------------------------------------- */
+
+    // How each currency writes a number. Symbol, how many decimal places it
+    // actually uses, and what it separates digits with -- none of which are
+    // derivable from the number itself.
     currencies: {
+        USD: { symbol: '$',  decimals: 2, thousandSep: ',', decimalSep: '.' },
+        CAD: { symbol: '$',  decimals: 2, thousandSep: ',', decimalSep: '.' },
+        AUD: { symbol: '$',  decimals: 2, thousandSep: ',', decimalSep: '.' },
+        NZD: { symbol: '$',  decimals: 2, thousandSep: ',', decimalSep: '.' },
+        SGD: { symbol: '$',  decimals: 2, thousandSep: ',', decimalSep: '.' },
+        GBP: { symbol: '£',  decimals: 2, thousandSep: ',', decimalSep: '.' },
+        EUR: { symbol: '€',  decimals: 2, thousandSep: '.', decimalSep: ',' },
+        CHF: { symbol: 'CHF', decimals: 2, thousandSep: '’', decimalSep: '.' },
+        JPY: { symbol: '¥',  decimals: 0, thousandSep: ',', decimalSep: '.' },
+        CNY: { symbol: '¥',  decimals: 2, thousandSep: ',', decimalSep: '.' },
+        SEK: { symbol: 'kr', decimals: 2, thousandSep: ' ', decimalSep: ',' },
+        NOK: { symbol: 'kr', decimals: 2, thousandSep: '.', decimalSep: ',' },
+        DKK: { symbol: 'kr', decimals: 2, thousandSep: '.', decimalSep: ',' },
+        BRL: { symbol: 'R$', decimals: 2, thousandSep: '.', decimalSep: ',' },
+        MXN: { symbol: '$',  decimals: 2, thousandSep: ',', decimalSep: '.' },
+        ILS: { symbol: '₪',  decimals: 2, thousandSep: ',', decimalSep: '.' },
+        INR: { symbol: '₹',  decimals: 2, thousandSep: ',', decimalSep: '.', grouping: 'indian' },
+        MYR: { symbol: 'RM', decimals: 2, thousandSep: ',', decimalSep: '.' },
+    },
 
-        'USD': {
-                symbol:'$',
-                decimals: 2,
-                thousandSep: ',',
-                decimalSep: '.',
-                },
-
-        'CAD': {
-                symbol:'$',
-                decimals: 2,
-                thousandSep: ',',
-                decimalSep: '.',
-                },
-
-        'EUR': {
-                symbol: '&euro;',
-                decimals: 2,
-                thousandSep: ',',
-                decimalSep: '.',
-                },
-
-        'AUD': {
-                symbol:'$',
-                decimals: 2,
-                thousandSep: ' ',
-                decimalSep: '.',
-                },
-
-        'NZD': {
-                symbol:'$',
-                decimals: 2,
-                thousandSep: ',',
-                decimalSep: '.',
-                },
-
-        'JPY': {
-                symbol: '&#165;',
-                decimals: 0,
-                thousandSep: ',',
-                decimalSep: '.',
-                },
-
-        'GBP': {
-                symbol: '&pound;',
-                decimals: 2,
-                thousandSep: ',',
-                decimalSep: '.',
-                },
-
-        'INR': {
-                symbol: '₹',
-                decimals: 2,
-                thousandSep: ',',
-                decimalSep: '.',
-                },
-
-        'SGD': {
-                symbol: '$',
-                decimals: 2,
-                thousandSep: ',',
-                decimalSep: '.',
-                },
-
-        'MYR': {
-                symbol: 'RM',
-                decimals: 2,
-                thousandSep: ',',
-                decimalSep: '.',
-                },
-
-        'SAR': {
-                symbol: '﷼',
-                decimals: 2,
-                thousandSep: ',',
-                decimalSep: '.',
-                },
-
-        'AED': {
-                symbol: 'د.إ',
-                decimals: 2,
-                thousandSep: ',',
-                decimalSep: '.',
-                },
-
-        'SEK': {
-                symbol: 'kr',
-                decimals: 2,
-                thousandSep: ' ',
-                decimalSep: ',',
-                },
-
-        'NOK': {
-                symbol: 'kr',
-                decimals: 2,
-                thousandSep: '.',
-                decimalSep: ',',
-                },
-
-        'DKK': {
-                symbol: 'kr',
-                decimals: 2,
-                thousandSep: '.',
-                decimalSep: ',',
-                },
-
-        'CLP': {
-                symbol: '$',
-                decimals: 0,
-                thousandSep: '.',
-                decimalSep: '.',
-                },
-
-        'MXN': {
-                symbol: '$',
-                decimals: 2,
-                thousandSep: ',',
-                decimalSep: '.',
-                },
-
-        'BRL': {
-                symbol: '$',
-                decimals: 2,
-                thousandSep: '.',
-                decimalSep: ',',
-                },
-
-        'ILS': {
-                symbol: '₪',
-                decimals: 2,
-                thousandSep: ',',
-                decimalSep: '.',
-                },
-
+    // Enough to render a sensible page before the network answers, or if it
+    // never does. Snapshot of ECB reference rates, 31 July 2026.
+    fallbackRates: {
+        USD: 1,      CAD: 1.4041, AUD: 1.4249, NZD: 1.5540, SGD: 1.2849,
+        GBP: 0.74508, EUR: 0.8707, CHF: 0.8101, JPY: 160.24, CNY: 6.7513,
+        SEK: 9.5651, NOK: 9.5272, DKK: 6.5087, BRL: 5.0583, MXN: 17.3715,
+        ILS: 3.0574, INR: 95.39,  MYR: 4.2130,
     },
 
 };
 
 
-// kind of silly QoL alias
-var Q = function (str) { return document.querySelectorAll(str)};
+window.Pforex = Pforex;
 
-
-/*
- * Cookies.js - 1.2.4-pre (5Nov2016)
- * https://github.com/ScottHamper/Cookies
- *
- * This is free and unencumbered software released into the public domain.
- */
-(function (global, undefined) {
-    'use strict';
-
-    var factory = function (window) {
-        if (typeof window.document !== 'object') {
-            throw new Error('Cookies.js requires a `window` with a `document` object');
-        }
-
-        var Cookies = function (key, value, options) {
-            return arguments.length === 1 ?
-                Cookies.get(key) : Cookies.set(key, value, options);
-        };
-
-        // Allows for setter injection in unit tests
-        Cookies._document = window.document;
-
-        // Used to ensure cookie keys do not collide with
-        // built-in `Object` properties
-        Cookies._cacheKeyPrefix = 'cookey.'; // Hurr hurr, :)
-        
-        Cookies._maxExpireDate = new Date('Fri, 31 Dec 9999 23:59:59 UTC');
-
-        Cookies.defaults = {
-            path: '/',
-            secure: false
-        };
-
-        Cookies.get = function (key) {
-            if (Cookies._cachedDocumentCookie !== Cookies._document.cookie) {
-                Cookies._renewCache();
-            }
-            
-            var value = Cookies._cache[Cookies._cacheKeyPrefix + key];
-
-            return value === undefined ? undefined : decodeURIComponent(value);
-        };
-
-        Cookies.set = function (key, value, options) {
-            options = Cookies._getExtendedOptions(options);
-            options.expires = Cookies._getExpiresDate(value === undefined ? -1 : options.expires);
-
-            Cookies._document.cookie = Cookies._generateCookieString(key, value, options);
-
-            return Cookies;
-        };
-
-        Cookies.expire = function (key, options) {
-            return Cookies.set(key, undefined, options);
-        };
-
-        Cookies._getExtendedOptions = function (options) {
-            return {
-                path: options && options.path || Cookies.defaults.path,
-                domain: options && options.domain || Cookies.defaults.domain,
-                expires: options && options.expires || Cookies.defaults.expires,
-                secure: options && options.secure !== undefined ?  options.secure : Cookies.defaults.secure
-            };
-        };
-
-        Cookies._isValidDate = function (date) {
-            return Object.prototype.toString.call(date) === '[object Date]' && !isNaN(date.getTime());
-        };
-
-        Cookies._getExpiresDate = function (expires, now) {
-            now = now || new Date();
-
-            if (typeof expires === 'number') {
-                expires = expires === Infinity ?
-                    Cookies._maxExpireDate : new Date(now.getTime() + expires * 1000);
-            } else if (typeof expires === 'string') {
-                expires = new Date(expires);
-            }
-
-            if (expires && !Cookies._isValidDate(expires)) {
-                throw new Error('`expires` parameter cannot be converted to a valid Date instance');
-            }
-
-            return expires;
-        };
-
-        Cookies._generateCookieString = function (key, value, options) {
-            key = key.replace(/[^#$&+\^`|]/g, encodeURIComponent);
-            key = key.replace(/\(/g, '%28').replace(/\)/g, '%29');
-            value = (value + '').replace(/[^!#$&-+\--:<-\[\]-~]/g, encodeURIComponent);
-            options = options || {};
-
-            var cookieString = key + '=' + value;
-            cookieString += options.path ? ';path=' + options.path : '';
-            cookieString += options.domain ? ';domain=' + options.domain : '';
-            cookieString += options.expires ? ';expires=' + options.expires.toUTCString() : '';
-            cookieString += options.secure ? ';secure' : '';
-
-            return cookieString;
-        };
-
-        Cookies._getCacheFromString = function (documentCookie) {
-            var cookieCache = {};
-            var cookiesArray = documentCookie ? documentCookie.split('; ') : [];
-
-            for (var i = 0; i < cookiesArray.length; i++) {
-                var cookieKvp = Cookies._getKeyValuePairFromCookieString(cookiesArray[i]);
-
-                if (cookieCache[Cookies._cacheKeyPrefix + cookieKvp.key] === undefined) {
-                    cookieCache[Cookies._cacheKeyPrefix + cookieKvp.key] = cookieKvp.value;
-                }
-            }
-
-            return cookieCache;
-        };
-
-        Cookies._getKeyValuePairFromCookieString = function (cookieString) {
-            // "=" is a valid character in a cookie value according to RFC6265, so cannot `split('=')`
-            var separatorIndex = cookieString.indexOf('=');
-
-            // IE omits the "=" when the cookie value is an empty string
-            separatorIndex = separatorIndex < 0 ? cookieString.length : separatorIndex;
-
-            var key = cookieString.substr(0, separatorIndex);
-            var decodedKey;
-            try {
-                decodedKey = decodeURIComponent(key);
-            } catch (e) {
-                if (console && typeof console.error === 'function') {
-                    console.error('Could not decode cookie with key "' + key + '"', e);
-                }
-            }
-            
-            return {
-                key: decodedKey,
-                value: cookieString.substr(separatorIndex + 1) // Defer decoding value until accessed
-            };
-        };
-
-        Cookies._renewCache = function () {
-            Cookies._cache = Cookies._getCacheFromString(Cookies._document.cookie);
-            Cookies._cachedDocumentCookie = Cookies._document.cookie;
-        };
-
-        Cookies._areEnabled = function () {
-            var testKey = 'cookies.js';
-            var areEnabled = Cookies.set(testKey, 1).get(testKey) === '1';
-            Cookies.expire(testKey);
-            return areEnabled;
-        };
-
-        Cookies.enabled = Cookies._areEnabled();
-
-        return Cookies;
-    };
-    var cookiesExport = (global && typeof global.document === 'object') ? factory(global) : factory;
-
-    // AMD support
-    if (typeof define === 'function' && define.amd) {
-        define(function () { return cookiesExport; });
-    // CommonJS/Node.js support
-    } else if (typeof exports === 'object') {
-        // Support Node.js specific `module.exports` (which can be a function)
-        if (typeof module === 'object' && typeof module.exports === 'object') {
-            exports = module.exports = cookiesExport;
-        }
-        // But always support CommonJS module 1.1.1 spec (`exports` cannot be a function)
-        exports.Cookies = cookiesExport;
-    } else {
-        global.Cookies = cookiesExport;
-    }
-})(typeof window === 'undefined' ? this : window);
-
-
-// forEach polyfill
-// Production steps of ECMA-262, Edition 5, 15.4.4.18
-// Reference: http://es5.github.io/#x15.4.4.18
-if (!Array.prototype.forEach) {
-
-  Array.prototype.forEach = function(callback/*, thisArg*/) {
-
-    var T, k;
-
-    if (this == null) {
-      throw new TypeError('this is null or not defined');
-    }
-
-    // 1. Let O be the result of calling toObject() passing the
-    // |this| value as the argument.
-    var O = Object(this);
-
-    // 2. Let lenValue be the result of calling the Get() internal
-    // method of O with the argument "length".
-    // 3. Let len be toUint32(lenValue).
-    var len = O.length >>> 0;
-
-    // 4. If isCallable(callback) is false, throw a TypeError exception. 
-    // See: http://es5.github.com/#x9.11
-    if (typeof callback !== 'function') {
-      throw new TypeError(callback + ' is not a function');
-    }
-
-    // 5. If thisArg was supplied, let T be thisArg; else let
-    // T be undefined.
-    if (arguments.length > 1) {
-      T = arguments[1];
-    }
-
-    // 6. Let k be 0
-    k = 0;
-
-    // 7. Repeat, while k < len
-    while (k < len) {
-
-      var kValue;
-
-      // a. Let Pk be ToString(k).
-      //    This is implicit for LHS operands of the in operator
-      // b. Let kPresent be the result of calling the HasProperty
-      //    internal method of O with argument Pk.
-      //    This step can be combined with c
-      // c. If kPresent is true, then
-      if (k in O) {
-
-        // i. Let kValue be the result of calling the Get internal
-        // method of O with argument Pk.
-        kValue = O[k];
-
-        // ii. Call the Call internal method of callback with T as
-        // the this value and argument list containing kValue, k, and O.
-        callback.call(T, kValue, k, O);
-      }
-      // d. Increase k by 1.
-      k++;
-    }
-    // 8. return undefined
-  };
+// Wait for a DOM to walk. The script is injected into the <head> on some
+// themes and just before </body> on others, and the old version assumed the
+// second -- so on the first kind it found no prices and did nothing.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { Pforex.init(); });
+} else {
+    Pforex.init();
 }
 
-// querySelectorAll polyfill
-document.querySelectorAll||(document.querySelectorAll=function(a){var b=document,c=b.documentElement.firstChild,d=b.createElement("STYLE");return c.appendChild(d),b.__qsaels=[],d.styleSheet.cssText=a+"{x:expression(document.__qsaels.push(this))}",window.scrollBy(0,0),b.__qsaels});
-
-Pforex.init();
+})(window, document);
