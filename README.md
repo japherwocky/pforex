@@ -292,15 +292,27 @@ fallback table rather than failing.
 DEVELOPING
 ----------
 
-There are no runtime dependencies and no build required to use the readable
-file. To regenerate the minified one after changing `static/pforex.js`:
+There are no runtime dependencies and nothing to build in order to *use* the
+library -- `static/pforex.js` is the shipped artifact and it is plain,
+readable JavaScript. The tooling below is only for working on it.
 
-    ./build.sh
+    npm install     # playwright and terser, dev only
+    npm test        # run the suite headlessly against both builds
+    ./build.sh      # regenerate static/pforex.min.js
 
-The test suite is a page. Serve the repo root and open it:
+### the test suite
+
+It is a page, so it stays readable and debuggable in a browser. Serve the
+repo root and open it:
 
     python -m http.server 8000
     # then http://localhost:8000/test/
 
-Add `?min=1` to run the identical suite against `static/pforex.min.js`, which
-is how a stale or broken minified build gets caught before it ships.
+Add `?min=1` to run the identical suite against `static/pforex.min.js`. That
+is how a stale or broken minified build gets caught -- it has drifted from
+the source before.
+
+`npm test` does exactly this without a browser window: it serves the repo,
+loads the page in headless Chromium, runs it against both builds, and fails
+on any failed assertion or console error. CI runs it on every push, along
+with a check that the committed `pforex.min.js` still matches a fresh build.

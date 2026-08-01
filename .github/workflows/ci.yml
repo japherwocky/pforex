@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run tests
+        run: npm test
+
+      # The minified build is committed, and used to be maintained by hand --
+      # it had drifted from the source once already. Regenerating it here and
+      # failing on any diff means it cannot go stale again unnoticed.
+      - name: Check pforex.min.js is in sync with source
+        run: |
+          ./build.sh
+          if ! git diff --exit-code -- static/pforex.min.js; then
+            echo ""
+            echo "static/pforex.min.js does not match static/pforex.js."
+            echo "Run ./build.sh and commit the result."
+            exit 1
+          fi

@@ -133,6 +133,26 @@
     check('no root configured is always a no-op',
           Pforex.subdomainCurrency('fr.example.com'), null);
 
+    /* ---- why the docs insist on closing the tag ----
+       `pforex` is not a void element, so a parser ignores the trailing
+       slash in `<pforex ... />`, leaves the tag open, and lets it swallow
+       whatever follows -- which render() then destroys when it replaces
+       the element's contents. Pinned here so the warning in the README
+       can't quietly stop being true. */
+    var probe = document.createElement('div');
+    probe.innerHTML = '<pforex price="100" />Free shipping over <b>$50</b>!';
+    var selfClosed = probe.querySelector('pforex');
+
+    check('a self-closed tag swallows the markup after it',
+          selfClosed.innerHTML, 'Free shipping over <b>$50</b>!');
+
+    document.body.appendChild(probe);
+    Pforex.render(selfClosed);
+    var survived = probe.innerHTML.indexOf('Free shipping') !== -1;
+    probe.remove();
+
+    check('and rendering into it destroys that markup', survived, false);
+
     /* ---- #3: rendering before rates arrive must not throw ---- */
     var saved = Pforex.rates;
     Pforex.rates = null;
