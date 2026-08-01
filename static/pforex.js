@@ -1,5 +1,5 @@
 /*
- * pforex 0.4 -- easy foreign currencies
+ * pforex 0.5 -- easy foreign currencies
  * https://github.com/japherwocky/pforex
  *
  * Drop this in with a <script> tag and it converts and formats every price
@@ -12,7 +12,7 @@
 
 var Pforex = {
 
-    version: '0.4',
+    version: '0.5',
 
     // Prices are authored in this currency, as integers in its smallest
     // unit (cents). `current` is what we are displaying right now.
@@ -34,6 +34,17 @@ var Pforex = {
     // keep it honest so the URL stays shareable -- see init(). Set it true
     // to always rewrite.
     syncQuery: false,
+
+    // A default currency per subdomain, for storefronts that run a language
+    // or region on its own subdomain -- fr.yourshop.com, en.yourshop.com --
+    // and want the currency to follow it without a cookie or a query param
+    // to fall back on. `root` is the bare domain; `subs` maps the leftmost
+    // label to a currency code. Both empty by default, in which case
+    // subdomainCurrency() always returns null and this is a no-op.
+    domains: {
+        root: null,
+        subs: {},
+    },
 
 
     /* ---- lifecycle ---------------------------------------------------- */
@@ -58,6 +69,15 @@ var Pforex = {
             this.syncQuery = true;
         } else if (this.readCookie('pforex') && this.currencies[this.readCookie('pforex')]) {
             this.current = this.readCookie('pforex');
+        } else {
+            // Lowest priority: a reader who has never chosen or been sent a
+            // currency explicitly still gets one appropriate to the
+            // subdomain they landed on, if the site configured one.
+            var subCurrency = this.subdomainCurrency();
+
+            if (subCurrency && this.currencies[subCurrency]) {
+                this.current = subCurrency;
+            }
         }
 
         // Render immediately off the fallback table and again when the live
@@ -272,6 +292,22 @@ var Pforex = {
     getParameterByName: function (name) {
         var match = new RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
         return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+    },
+
+    // The currency configured for the current subdomain, or null if
+    // `domains.root` isn't set, the hostname isn't a subdomain of it, or the
+    // leftmost label has no entry in `domains.subs`. Takes an explicit
+    // hostname so it is testable without touching window.location.
+    subdomainCurrency: function (hostname) {
+        hostname = hostname || window.location.hostname;
+
+        if (!this.domains.root || hostname === this.domains.root ||
+            hostname.slice(-this.domains.root.length - 1) !== '.' + this.domains.root) {
+            return null;
+        }
+
+        var label = hostname.split('.')[0];
+        return this.domains.subs[label] || null;
     },
 
     // replaceState rather than pushState: the reader flipping a currency

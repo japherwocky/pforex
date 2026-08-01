@@ -117,6 +117,22 @@
     check('selectors resync on change',
           document.getElementById('selector').value, 'USD');
 
+    /* ---- #5: subdomain currency defaults ---- */
+    Pforex.domains = { root: 'example.com', subs: { fr: 'EUR', en: 'USD' } };
+
+    check('a mapped subdomain resolves to its currency',
+          Pforex.subdomainCurrency('fr.example.com'), 'EUR');
+    check('the bare root domain has no subdomain to match',
+          Pforex.subdomainCurrency('example.com'), null);
+    check('an unrelated domain never matches',
+          Pforex.subdomainCurrency('fr.example.org'), null);
+    check('a subdomain with no entry in subs falls through',
+          Pforex.subdomainCurrency('de.example.com'), null);
+
+    Pforex.domains = { root: null, subs: {} };
+    check('no root configured is always a no-op',
+          Pforex.subdomainCurrency('fr.example.com'), null);
+
     /* ---- #3: rendering before rates arrive must not throw ---- */
     var saved = Pforex.rates;
     Pforex.rates = null;

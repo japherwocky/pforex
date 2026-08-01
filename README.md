@@ -200,6 +200,24 @@ so a link that specifies a currency stays accurate as the reader changes it,
 and a page that never mentioned one is left alone. Uses `replaceState`, so it
 does not fill up the Back button.
 
+### `domains`
+
+A default currency per subdomain, for a storefront that runs a language or
+region on its own subdomain and wants the currency to follow it:
+
+    Pforex.init({
+        domains: {
+            root: 'yourshop.com',
+            subs: { en: 'USD', fr: 'EUR', jp: 'JPY' },
+        },
+    });
+
+`fr.yourshop.com` then defaults to EUR with no cookie or query parameter
+needed. This is the lowest-priority default of the three -- an explicit
+`?currency=` or a returning visitor's remembered cookie both win over it, so
+a reader who has already made a choice never gets overridden by which
+subdomain they happened to land on.
+
 
 DEVELOPING
 ----------
