@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>pforex tests</title>
+<style>
+  body { font-family: monospace; margin: 2rem; max-width: 60rem; }
+  h1 { font-size: 1.2rem; }
+  li { margin: .2rem 0; }
+  .pass { color: #17692a; }
+  .fail { color: #b00020; font-weight: bold; }
+  #summary { font-weight: bold; margin: 1rem 0; }
+  .fixtures { display: none; }
+</style>
+</head>
+<body>
+
+<h1>pforex tests</h1>
+<div id="summary">running…</div>
+<ul id="results"></ul>
+
+<!-- The markup under test. Hidden: we assert on textContent, not on looks. -->
+<div class="fixtures">
+  <pforex id="plain" price="1950"></pforex>
+  <pforex id="round" price="800"></pforex>
+  <pforex id="big" price="500000"></pforex>
+  <pforex id="lakh" price="10000000"></pforex>
+  <pforex id="withcode" price="1950" show-currency="true"></pforex>
+  <pforex id="nosymbol" price="1950" show-symbol="false"></pforex>
+  <pforex id="label" show-symbol="false" show-currency="true"></pforex>
+  <pforex id="giftcard" price="10000" re="(.+?) GIFTCARD">N GIFTCARD</pforex>
+  <span id="legacy" data-pforex-price="1950"></span>
+  <span id="legacyre" data-pforex-price="100" data-pforex-re="\((.+?)\)">SPECIAL THING ($1)</span>
+  <pforex id="dynamic" price="100"></pforex>
+
+  <select id="selector" pforex-selector>
+    <option value="USD">USD</option>
+    <option value="EUR">EUR</option>
+    <option value="JPY">JPY</option>
+  </select>
+</div>
+
+<!-- Runs against the readable build by default; add ?min=1 to run the exact
+     same suite against the minified one, which is how we catch a stale or
+     broken pforex.min.js instead of shipping it. document.write, because the
+     library has to be parsed before the suite below references it. -->
+<script>
+  document.write('<script src="../static/pforex' +
+    (/[?&]min=1/.test(location.search) ? '.min' : '') + '.js"><\/script>');
+</script>
+<script>
+(function () {
+  var results = [];
+
+  function check(name, actual, expected) {
+    results.push({ name: name, actual: actual, expected: expected, ok: actual === expected });
+  }
+
+  function text(id) {
+    return document.getElementById(id).textContent;
+  }
+
+  // Deterministic rates, so a test failure means a formatting bug and never
+  // a move in the market. Deliberately round numbers: the arithmetic is not
+  // what is under test here.
+  function useRates() {
+    Pforex.rates = { USD: 1, EUR: 0.5, JPY: 100, SEK: 10, INR: 100 };
+  }
+
+  function run() {
+    useRates();
+
+    /* ---- formatting, USD ---- */
+    Pforex.set('USD');
+
+    // #4: rounding used to drop trailing zeros, giving $19.5 and $8.
+    check('trailing zeros survive', text('plain'), '$19.50');
+    check('whole amounts keep decimals', text('round'), '$8.00');
+    check('thousands are grouped', text('big'), '$5,000.00');
+
+    /* ---- attribute defaults ---- */
+    check('currency code is off by default', text('plain'), '$19.50');
+    check('show-currency adds the code', text('withcode'), '$19.50 USD');
+    check('show-symbol=false drops the symbol', text('nosymbol'), '19.50');
+    check('a price-less tag is a bare label', text('label'), 'USD');
+
+    /* ---- the regex escape hatch ---- */
+    check('regex swaps the capture group', text('giftcard'), '$100.00 GIFTCARD');
+    check('legacy data-* attributes work', text('legacy'), '$19.50');
+    check('legacy regex leaves surrounding copy',
+          text('legacyre'), 'SPECIAL THING ($1.00)');
+
+    /* ---- per-currency formatting ---- */
+    Pforex.set('EUR');
+    check('EUR separators invert', text('plain'), '€9,75');
+
+    Pforex.set('JPY');
+    check('JPY carries no decimals', text('plain'), '¥1,950');
+    check('JPY still groups thousands', text('big'), '¥500,000');
+
+    Pforex.set('SEK');
+    check('SEK groups with a space', text('big'), 'kr50 000,00');
+
+    // #7: the old separator regex broke every three digits everywhere, so
+    // these rendered as 500,000 and 10,000,000.
+    Pforex.set('INR');
+    check('INR groups at the lakh', text('big'), '₹5,00,000.00');
+    check('INR groups at the crore', text('lakh'), '₹1,00,00,000.00');
+
+    /* ---- selection ---- */
+    Pforex.set('USD');
+    check('get() reports the current currency', Pforex.get(), 'USD');
+
+    Pforex.set('NOT_A_CURRENCY');
+    check('an unknown currency is refused', Pforex.get(), 'USD');
+
+    check('selectors resync on change',
+          document.getElementById('selector').value, 'USD');
+
+    /* ---- #3: rendering before rates arrive must not throw ---- */
+    var saved = Pforex.rates;
+    Pforex.rates = null;
+    var threw = false;
+    try {
+      Pforex.update();
+    } catch (e) {
+      threw = true;
+    }
+    Pforex.rates = saved;
+    check('rendering without rates is a no-op, not a crash', threw, false);
+
+    /* ---- the MutationObserver path is async, so it reports last ---- */
+    useRates();
+    Pforex.set('USD');
+
+    var dynamic = document.getElementById('dynamic');
+    dynamic.setAttribute('price', '1413');
+
+    setTimeout(function () {
+      check('changing price re-renders in place', text('dynamic'), '$14.13');
+      report();
+    }, 50);
+  }
+
+  function report() {
+    var list = document.getElementById('results');
+    var failed = 0;
+
+    results.forEach(function (r) {
+      var li = document.createElement('li');
+      li.className = r.ok ? 'pass' : 'fail';
+      li.textContent = (r.ok ? 'PASS  ' : 'FAIL  ') + r.name +
+        (r.ok ? '' : '  — got ' + JSON.stringify(r.actual) +
+                     ', wanted ' + JSON.stringify(r.expected));
+      list.appendChild(li);
+      if (!r.ok) { failed++; }
+    });
+
+    document.getElementById('summary').textContent =
+      failed ? (failed + ' of ' + results.length + ' FAILED')
+             : ('all ' + results.length + ' passed');
+
+    // For automated runs.
+    window.__pforex_results = { total: results.length, failed: failed, results: results };
+  }
+
+  // Let the library finish its own init (it waits for DOMContentLoaded)
+  // before we start overriding rates underneath it.
+  window.addEventListener('load', run);
+}());
+</script>
+
+</body>
+</html>
