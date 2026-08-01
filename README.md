@@ -34,6 +34,20 @@ SET CURRENCY
 </select>
 
 
+### w/ URL parameters:
+
+pforex looks for a `currency` parameter on the page's URL and sets it on
+load, before falling back to a remembered cookie and then to `base`:
+
+    <a href="/products/kettle?currency=JPY">See prices in yen</a>
+
+Use this on links to make sure traffic lands on a page already showing the
+right currency. If the page was loaded this way, changing the selector
+afterward keeps `?currency=` in the address bar in sync -- see `syncQuery`
+under CONFIGURATION -- so the URL stays something you can copy and send to
+someone else.
+
+
 ### w/ Javascript:
 
     Pforex.set("USD")
