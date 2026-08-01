@@ -76,55 +76,61 @@ and click "Change Formatting".
 
 Under "Currency Formatting", set "HTML with currency" to:
 
-    <pforex price=${{amount}} show-currency=true />
+    <pforex price=${{amount}} show-currency=true></pforex>
 
 and "HTML without currency" to:
 
-    <pforex price=${{amount}} />
+    <pforex price=${{amount}}></pforex>
 
 __CAREFUL__: _Do not use quotation marks_ after `price` or `show-currency`, this _will break_ the code.
+
+__ALSO CAREFUL__: close the tag with `</pforex>`. Writing `<pforex ... />`
+looks like it should work, but `pforex` is not one of HTML's self-closing
+elements, so the browser ignores that slash, leaves the tag open, and lets it
+swallow whatever markup follows it -- which then gets wiped out when the
+price renders.
 
 
 ### DEFAULTS
 
 #### use integers for prices
 
-    <pforex price="100" />
+    <pforex price="100"></pforex>
 
-$1
+$1.00
 
 
 #### decimals will show up if appropriate
 
-    <pforex price="399" />
+    <pforex price="399"></pforex>
 
 $3.99
 
 
 #### and commas
 
-    <pforex price="500000" />
+    <pforex price="500000"></pforex>
 
-$5,000
+$5,000.00
 
 
 #### showing currency defaults to "false":
 
-    <pforex price="500000" show-currency="true" />
+    <pforex price="500000" show-currency="true"></pforex>
 
-$5,000 USD
+$5,000.00 USD
 
 
 #### showing the currency symbol defaults to "true":
 
-    <pforex price="500000" show-symbol="false" />
+    <pforex price="500000" show-symbol="false"></pforex>
 
-5,000
+5,000.00
 
 
 #### Omit the price for labels:
 
-    <pforex show-symbol="false" show-currency="true" />
+    <pforex show-symbol="false" show-currency="true"></pforex>
 
 USD
 
@@ -133,7 +139,7 @@ USD
 
     <pforex price="10000" re="(.+?) GIFTCARD">N GIFTCARD</pforex>
 
-$100 GIFTCARD
+$100.00 GIFTCARD
 
 
 
@@ -162,7 +168,7 @@ DYNAMIC
 
 ### to change the price of an element, just change `price`
 
-    <pforex id="dynamic-display" price="100" />
+    <pforex id="dynamic-display" price="100"></pforex>
 
     <button id="clicker" >CLICK ME</button>
 
